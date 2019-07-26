@@ -13,6 +13,13 @@ from app.utils import download_file, store_file
 
 
 class Client:
+    """
+    Application client class. All client pipeline is implemented here.
+    In init function required named args needs to be passed.
+    Then needs to be called prepare() function that will store in set
+    (RAM memory) image hashes. And then run() function will start scrapping
+    processors and will download all images.
+    """
     BASE_URL = 'https://www.smashingmagazine.com/category/wallpapers/'
 
     def __init__(
@@ -25,6 +32,15 @@ class Client:
             resolution: str,
             timeout: int
     ):
+        """
+        Constructing client. Storing all necessary params
+        :param path: path where is images stored and will be stored new wallpapers
+        :param num_processes: num of user CPUs
+        :param start_time: start time from which wallpapers is needed
+        :param end_time: end time from which wallpapers is needed
+        :param resolution: needed resolution for wallpapers
+        :param timeout: timeout for downloading images requests
+        """
         self.hashes = None
         self.num_processes: int = num_processes
         self.path: pathlib.Path = pathlib.Path(path)
@@ -34,6 +50,13 @@ class Client:
         self.timeout: int = timeout
 
     def prepare(self):
+        """
+        Preparing app client: read all files from user defined path and
+        get all image hashes in set. SHA256 is used, it's speed more than 170Mbps,
+        so it's OK even for more than 40-50Gb wallpapers images before downloaded.
+        Work in process pool for speed boost
+        :return: self
+        """
         images_list = [f for f in self.path.glob('*.jpg')]
 
         logging.info('Calculating hash for already existing images')
@@ -44,9 +67,27 @@ class Client:
         return self
 
     def run(self):
+        """
+        Starting client and scrapping jobs. And then get results from
+        scrapping (url list of images) and start processes in pool for
+        downloading and storing non-duplicate images.
+        :return: self
+        """
+        if self.hashes is None:
+            logging.error(f'prepare() function was not called before')
+            return None
         results = []
 
         def crawler_results(signal, sender, item, response, spider):
+            """
+            help function for getting result when one page scrapped
+            :param signal:
+            :param sender:
+            :param item:
+            :param response:
+            :param spider:
+            :return:
+            """
             results.append(item)
 
         dispatcher.connect(crawler_results, signal=signals.item_passed)
@@ -73,6 +114,12 @@ class Client:
         return self
 
     def _process_urls(self, image_url):
+        """
+        Downloading image from image_url, check if it's not already stored
+        in directory and store it.
+        :param image_url: image url that needs to be downloaded and stored
+        :return:
+        """
         image_name = pathlib.Path(image_url).name
         image = download_file(image_url, self.timeout)
         if image is not None:
@@ -85,5 +132,10 @@ class Client:
 
     @staticmethod
     def _calculate_hash(file_uri):
+        """
+        calculating hash for file that already stored on user file system
+        :param file_uri: file url on disk
+        :return: string hexdigest of sha256
+        """
         with open(file_uri, 'rb') as in_file:
             return hashlib.sha256(in_file.read()).hexdigest()

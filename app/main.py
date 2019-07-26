@@ -1,3 +1,8 @@
+"""
+main.py
+
+Main script for starting wallpapers scrapping jobs.
+"""
 import logging
 import multiprocessing
 import time
