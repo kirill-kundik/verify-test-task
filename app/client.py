@@ -13,7 +13,7 @@ from app.utils import download_file, store_file
 
 
 class Client:
-    BASE_URL = ''
+    BASE_URL = 'https://www.smashingmagazine.com/category/wallpapers/'
 
     def __init__(
             self,
@@ -57,12 +57,15 @@ class Client:
             WallpapersSpider,
             start_time=self.start_time,
             end_time=self.end_time,
-            resolution=self.resolution
+            resolution=self.resolution,
+            start_url=self.BASE_URL
         )
         logging.getLogger('scrapy').setLevel(logging.ERROR)
         process.start()
 
         results = [x for res in results for x in res['urls']]
+
+        logging.info(f'ALL IMAGES URLS: {", ".join(results)}')
 
         with multiprocessing.Pool(self.num_processes) as pool:
             pool.map(self._process_urls, results)
