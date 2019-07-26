@@ -55,12 +55,14 @@ def setup_logging(log_file: pathlib.Path, verbose: bool):
                         format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                         filename=log_file,
                         filemode='a')
+    console = logging.StreamHandler()
     if verbose:
-        console = logging.StreamHandler()
         console.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
-        console.setFormatter(formatter)
-        logging.getLogger("").addHandler(console)
+    else:
+        console.setLevel(logging.ERROR)
+    formatter = logging.Formatter('%(asctime)s : %(levelname)s : %(message)s')
+    console.setFormatter(formatter)
+    logging.getLogger("").addHandler(console)
 
     logging.info('ARGS PARSED, LOGGING CONFIGURED.')
 
@@ -103,8 +105,10 @@ def store_file(content: bytearray, path: pathlib.Path):
     :param path: path to the file where to store content
     :return:
     """
+    logging.info(f'Storing file into {path}')
     with open(str(path), 'wb') as output:
         output.write(content)
+        logging.info(f'Successfully stored into: {path}')
 
 
 def download_file(url: str, timeout: int) -> bytearray:

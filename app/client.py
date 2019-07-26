@@ -1,9 +1,15 @@
+import datetime
+import hashlib
 import logging
 import multiprocessing
 import pathlib
-import datetime
 
-from app.pool_workers import calculate_hash
+from scrapy import signals
+from scrapy.crawler import CrawlerProcess
+from scrapy.signalmanager import dispatcher
+
+from app.crawler import WallpapersSpider
+from app.utils import download_file, store_file
 
 
 class Client:
@@ -20,7 +26,7 @@ class Client:
             timeout: int
     ):
         self.hashes = None
-        self.pool: multiprocessing.Pool = multiprocessing.Pool(num_processes)
+        self.num_processes: int = num_processes
         self.path: pathlib.Path = pathlib.Path(path)
         self.start_time: datetime.date = datetime.date.fromisoformat(start_time)
         self.end_time: datetime.date = datetime.date.fromisoformat(end_time)
@@ -32,10 +38,49 @@ class Client:
 
         logging.info('Calculating hash for already existing images')
 
-        with self.pool as pool:
-            self.hashes = set(pool.map(calculate_hash, images_list))
+        with multiprocessing.Pool(self.num_processes) as pool:
+            self.hashes = set(pool.map(self._calculate_hash, images_list))
 
         return self
 
     def run(self):
+        results = []
+
+        def crawler_results(signal, sender, item, response, spider):
+            results.append(item)
+
+        dispatcher.connect(crawler_results, signal=signals.item_passed)
+        process = CrawlerProcess({
+            'USER_AGENT': 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)'
+        })
+        process.crawl(
+            WallpapersSpider,
+            start_time=self.start_time,
+            end_time=self.end_time,
+            resolution=self.resolution
+        )
+        logging.getLogger('scrapy').setLevel(logging.ERROR)
+        process.start()
+
+        results = [x for res in results for x in res['urls']]
+
+        with multiprocessing.Pool(self.num_processes) as pool:
+            pool.map(self._process_urls, results)
+
         return self
+
+    def _process_urls(self, image_url):
+        image_name = pathlib.Path(image_url).name
+        image = download_file(image_url, self.timeout)
+        if image is not None:
+            if not hashlib.sha256(image).hexdigest() in self.hashes:
+                store_file(image, self.path / image_name)
+            else:
+                logging.info(f'File has been downloaded previous time. Skipping... Image name: {image_name}')
+        else:
+            logging.warning(f'Got None instead of image content from: {image_url}')
+
+    @staticmethod
+    def _calculate_hash(file_uri):
+        with open(file_uri, 'rb') as in_file:
+            return hashlib.sha256(in_file.read()).hexdigest()
