@@ -76,7 +76,12 @@ class Client:
         if self.hashes is None:
             logging.error(f'prepare() function was not called before')
             return None
-        results = []
+        # results = []
+        queue = multiprocessing.Queue()
+        pool = [multiprocessing.Process(target=self._queue_worker, args=(queue,)) for _ in range(self.num_processes)]
+        for process in pool:
+            process.start()
+        # pool = multiprocessing.Pool(self.num_processes, self._worker_main, (queue,))
 
         def crawler_results(signal, sender, item, response, spider):
             """
@@ -88,7 +93,9 @@ class Client:
             :param spider:
             :return:
             """
-            results.append(item)
+            # results.append(item)
+            for x in item['urls']:
+                queue.put(x)
 
         dispatcher.connect(crawler_results, signal=signals.item_passed)
         process = CrawlerProcess({
@@ -103,15 +110,24 @@ class Client:
         )
         logging.getLogger('scrapy').setLevel(logging.ERROR)
         process.start()
+        for _ in range(self.num_processes):
+            queue.put('STOP')
+        # results = [x for res in results for x in res['urls']]
 
-        results = [x for res in results for x in res['urls']]
+        # logging.info(f'ALL IMAGES URLS: {", ".join(results)}')
 
-        logging.info(f'ALL IMAGES URLS: {", ".join(results)}')
-
-        with multiprocessing.Pool(self.num_processes) as pool:
-            pool.map(self._process_urls, results)
-
+        # with multiprocessing.Pool(self.num_processes) as pool:
+        #     pool.map(self._process_urls, results)
+        for process in pool:
+            process.join()
         return self
+
+    def _queue_worker(self, queue):
+        for url in iter(queue.get, 'STOP'):
+            logging.info(f'Processing {url}')
+            self._process_urls(url)
+        logging.info(f'All url processed by this worker')
+        return
 
     def _process_urls(self, image_url):
         """
