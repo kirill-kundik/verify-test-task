@@ -27,7 +27,7 @@ def test_download_file(timeout, true_url, not_found_url, timeout_url, incorrect_
     assert resp == r.content
 
 
-def test_do_stuff_with_file(timeout, true_url):
+def test_store_file(timeout, true_url):
     url = true_url
 
     r = requests.get(url, timeout=timeout)
