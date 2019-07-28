@@ -66,11 +66,6 @@ def start_url():
 
 
 @pytest.fixture()
-def path():
-    return '/Users/kyrylo_kundik/PycharmProjects/verify-test-task/images'
-
-
-@pytest.fixture()
 def correct_res():
     return [
         'http://files.smashingmagazine.com/wallpapers/june-19/summer-is-coming/cal/june-19-summer-is-coming-cal-2560x1440.jpg',
