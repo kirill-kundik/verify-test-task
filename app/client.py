@@ -81,6 +81,7 @@ class Client:
         pool = [multiprocessing.Process(target=self._queue_worker, args=(queue,)) for _ in range(self.num_processes)]
         for process in pool:
             process.start()
+
         # pool = multiprocessing.Pool(self.num_processes, self._worker_main, (queue,))
 
         def crawler_results(signal, sender, item, response, spider):
@@ -139,8 +140,10 @@ class Client:
         image_name = pathlib.Path(image_url).name
         image = download_file(image_url, self.timeout)
         if image is not None:
-            if not hashlib.sha256(image).hexdigest() in self.hashes:
+            img_hash = hashlib.sha256(image).hexdigest()
+            if img_hash not in self.hashes:
                 store_file(image, self.path / image_name)
+                self.hashes.update({img_hash})
             else:
                 logging.info(f'File has been downloaded previous time. Skipping... Image name: {image_name}')
         else:
